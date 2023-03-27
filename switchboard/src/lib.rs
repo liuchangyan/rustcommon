@@ -13,6 +13,8 @@ use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::sync::Arc;
 
+static mut LAST_THREAD: usize = 0;
+
 /// A struct for sending and receiving items by using very simple routing. This
 /// allows for us to send messages to a specific receiver, to any receiver, or
 /// all receivers. Automatically wraps items with the identifier of the sender
@@ -210,9 +212,18 @@ impl<T, U> Queues<T, U> {
     /// but it is desirable to have items spread evenly across receivers. For
     /// example, this can be used to send accepted TCP streams to worker threads
     /// in a manner that is roughly balanced.
+    
+    
     pub fn try_send_any(&mut self, item: T) -> Result<(), T> {
-        let id = self.rng.sample(self.distr);
-        self.senders[id]
+        let tid;
+
+        unsafe{
+            tid= (LAST_THREAD + 1) % self.senders.len();
+            LAST_THREAD = tid;
+        }
+
+        // let id = self.rng.sample(self.distr);
+        self.senders[tid]
             .try_send(TrackedItem {
                 sender: self.id,
                 inner: item,
